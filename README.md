@@ -4,13 +4,13 @@ This repository is your central hub for learning Git from fundamentals to real-w
 
 What You’ll Find in This Repository
 -----------------------------------------------------------------------------------------------------------------------------------------------
-1. **Organized by Parts:** Foundations, Collaboration & Production Workflows, and Advanced History & Integration Strategies
-**Core Concept Notes:** Git architecture, commits, staging, and history model
-**Branching & Merging:** Fast-forward, three-way merge, and conflict resolution
-**Undo Operations:** git reset and git revert explained with practical scenarios
-**Advanced Workflows:** diff, stash, rebasing, interactive rebase, squash, and cherry-pick
-**Collaboration Models:** remotes, push/pull/fetch, pull requests, and code reviews
-**Production Insights:** real-world Git workflows, integration strategies, and history management in teams
+1. **Organized by Parts:** Foundations, Collaboration & Production Workflows, and Advanced History & Integration Strategies.
+2. **Core Concept Notes:** Git architecture, commits, staging, and history model
+3. **Branching & Merging:** Fast-forward, three-way merge, and conflict resolution
+4. **Undo Operations:** git reset and git revert explained with practical scenarios
+5. **Advanced Workflows:** diff, stash, rebasing, interactive rebase, squash, and cherry-pick
+6. **Collaboration Models:** remotes, push/pull/fetch, pull requests, and code reviews
+7. **Production Insights:** real-world Git workflows, integration strategies, and history management in teams
 
 Why Follow This Masterclass?
 ------------------------------------------------------------------------------------------------------------------------------------------------
