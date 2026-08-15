@@ -1,1 +1,3295 @@
 
+# How GIT Works in Production
+----------------------------------------------------------------------------------------
+## Table of Contents
+----------------------------------------------------------------------------------------
+- [Introduction](#introduction)  
+- [Why Git?](#why-git)  
+- [What Is Git?](#what-is-git)  
+  - [Distributed Architecture](#distributed-architecture)  
+  - [Snapshot-Based Version Control](#snapshot-based-version-control)  
+- [Git vs GitHub – Foundational Clarification](#git-vs-github--foundational-clarification)  
+- [Installing Git](#installing-git)  
+- [What Is a Git Repository?](#what-is-a-git-repository)  
+- [Initializing a Repository](#initializing-a-repository)  
+- [Git Architecture: Core Constructs](#git-architecture-core-constructs)  
+  - [Working Directory](#1-working-directory)  
+  - [Staging Area (Index)](#2-staging-area-index)  
+  - [What Is a Commit?](#what-is-a-commit)  
+  - [Local Repository](#3-local-repository)  
+  - [Remote Repository](#4-remote-repository)  
+- [The Core Workflow](#the-core-workflow)  
+- [**Demo:** Practical Walkthrough](#practical-walkthrough)  
+  - [Stage the File](#stage-the-file)  
+  - [Create the First Commit](#create-the-first-commit)  
+- [Conventional Commits (Modern Standard)](#conventional-commits-modern-standard)  
+- [Configuring Git Identity](#configuring-git-identity)  
+  - [Where Are Git Configuration Values Stored?](#where-are-git-configuration-values-stored)  
+- [Viewing Commit History](#viewing-commit-history)  
+- [Committing Without `-m`](#committing-without--m)  
+- [Ignoring Files with `.gitignore`](#ignoring-files-with-gitignore)  
+  - [**Demo:** Creating and Using `.gitignore`](#demo-creating-and-using-gitignore)  
+- [Branches in Git](#branches-in-git)  
+  - [Why Create a Branch?](#why-create-a-branch)  
+  - [What Is a Branch?](#what-is-a-branch)  
+  - [Common Branch Naming Conventions](#common-branch-naming-conventions)  
+- [Visualizing Branches](#visualizing-branches)  
+  - [Creating a Feature Branch](#creating-a-feature-branch)  
+  - [Parallel Development](#parallel-development)  
+- [Atomic Development in Git](#atomic-development-in-git)  
+- [**Demo:** Working with Branches (Commands)](#demo-working-with-branches-commands)  
+  - [Step 1: Check Existing Branches](#step-1-check-existing-branches)  
+  - [Step 2: Create Baseline Commit History](#step-2-create-baseline-commit-history)  
+  - [Step 3: Create and Switch to a Feature Branch](#step-3-create-and-switch-to-a-feature-branch-understanding-head)  
+  - [Step 4: Add Work on the Feature Branch](#step-4-add-work-on-the-feature-branch)  
+  - [Step 5: Switch Back to the Master Branch](#step-5-switch-back-to-the-master-branch)  
+- [Git Merge](#git-merge)  
+  - [Understanding Branch Divergence](#understanding-branch-divergence)  
+  - [Fast-Forward Merge](#1-fast-forward-merge)  
+  - [Three-Way Merge (True Merge)](#2-three-way-merge-true-merge)  
+- [**Demo:** Merge Scenarios](#step-6-perform-a-fast-forward-merge-feature-branch)  
+  - [Step 6: Perform a Fast-Forward Merge](#step-6-perform-a-fast-forward-merge-feature-branch)  
+  - [Step 7: Create Branch Divergence](#step-7-create-branch-divergence-to-demonstrate-a-true-merge)  
+  - [Step 8: Perform a Three-Way Merge](#step-8-perform-a-three-way-merge)  
+  - [Visualizing the Commit Graph](#visualizing-the-commit-graph)  
+- [Merge Conflicts](#step-9-demonstrate-a-merge-conflict)  
+  - [Step 9: Demonstrate a Merge Conflict](#step-9-demonstrate-a-merge-conflict)  
+  - [Resolving the Conflict](#completing-the-merge)  
+  - [Inspecting the Graph After Conflict](#inspecting-the-commit-graph-after-the-merge)  
+  - [Cleaning Up the Branch](#cleaning-up-the-conflict-branch)  
+- [Rename Default Branch](#step-10-rename-master-to-main)  
+- [Undoing Commits: Reset vs Revert](#undoing-commits-git-reset--git-revert)  
+  - [`git reset`](#1-git-reset)  
+    - [Types of Reset](#types-of-reset)  
+    - [**Demo:** Reset](#demo-reset---mixed-default)  
+    - [Using `git reflog`](#inspecting-what-happened-with-git-reflog)  
+  - [`git revert`](#2-git-revert)  
+    - [**Demo:** Revert](#demo-revert)  
+  - [When to Use Each](#when-to-use-each)  
+- [Conclusion](#conclusion)  
+- [References](#references)
+
+---
+
+# Introduction
+
+Modern software systems evolve continuously. Features are introduced, bugs are fixed, infrastructure changes, and teams collaborate across distributed environments. In such an ecosystem, managing change safely and transparently becomes critical.
+
+Git is the system that makes this possible.
+
+Originally designed to manage large-scale open-source projects like the Linux kernel, Git has become the **de facto standard for version control across the software industry**. It enables engineers to track changes, collaborate safely, experiment without risk, and maintain a reliable history of how systems evolve over time.
+
+Today, Git is not limited to application code. In modern DevOps and cloud-native environments, many critical aspects of infrastructure are also defined through code. Kubernetes manifests, Terraform configurations, CI/CD pipelines, Dockerfiles, and automation scripts are all stored and versioned using Git.
+
+Practices such as **Infrastructure as Code (IaC)** and **GitOps** rely heavily on Git as the **system of record for desired system state**. By managing infrastructure and application configuration in Git, teams gain traceability, auditability, and safe rollback capabilities.
+
+This masterclass is designed to build a **deep conceptual understanding of Git**, not just command familiarity.
+
+In **Part 1**, we focus on the **core foundations of Git**, including:
+
+* Git architecture and internal concepts
+* The working directory, staging area, and repository model
+* Commits and commit history
+* Branching and parallel development
+* Fast-forward and three-way merges
+* Merge conflicts and resolution
+* Undoing changes with `git reset` and `git revert`
+
+By the end of this section, you will understand **how Git actually works internally**, which is far more valuable than memorizing individual commands.
+
+Part 2 of the masterclass will build on these foundations and explore **collaboration workflows, remote repositories, pull requests, rebasing strategies, and advanced Git operations used in production environments**.
+
+---
+
+## Why Git?
+
+![Alt text](/images/a1.png)
+
+Modern software evolves continuously. Features are added. Bugs are fixed. Systems are refactored. Teams scale. Release frequency increases. Change is constant.
+
+Without version control, change introduces risk.
+
+While version control originally focused on **application source code**, modern engineering workflows extend it far beyond that.
+
+Today, many aspects of infrastructure and platform configuration are defined using **declarative files**, which must also be version controlled. Examples include:
+
+* **Kubernetes manifests** defining application deployments and services
+* **Terraform templates** describing cloud infrastructure
+* **Ansible playbooks** automating configuration management
+* **CI/CD pipelines** defining build and deployment workflows
+* **Dockerfiles** defining container images
+* **Helm charts** describing Kubernetes applications
+
+In modern DevOps practices such as **Infrastructure as Code (IaC)** and **GitOps**, these configuration files represent the **desired state of systems**. Managing them in Git ensures that infrastructure changes are tracked, reviewed, auditable, and reversible in the same way as application code.
+
+Without version control, managing these changes becomes operationally risky.
+
+#### Operational risks without version control
+
+* **No Reliable History**
+  There is no structured record of what changed, who changed it, or why. Root cause analysis becomes guesswork rather than investigation.
+
+* **Unsafe Rollbacks**
+  Recovering a previous working state requires manual reconstruction. Critical production reversions become slow and error-prone.
+
+* **Accidental Overwrites**
+  Multiple contributors modifying the same files leads to silent data loss. There is no built-in conflict detection or merge safety.
+
+* **Fear of Experimentation**
+  Without safe isolation mechanisms, engineers hesitate to try ideas. Innovation slows because failure is costly.
+
+* **Unstructured Collaboration**
+  Coordination depends on human communication rather than system guarantees. As team size grows, coordination complexity grows non-linearly.
+
+Early centralized version control systems improved traceability but imposed structural constraints.
+
+---
+
+> Git therefore becomes the **system that manages change across both application code and infrastructure definitions**.
+
+
+---
+
+
+## What Is Git?
+
+![Alt text](/images/a1.png)
+
+Git is a **distributed version control system (DVCS)** designed to track changes in software projects safely and efficiently.
+
+> It was created in 2005 by **Linus Torvalds**, the same engineer who created the **Linux kernel**. Git was originally built to manage the development of the Linux kernel, one of the largest and most complex open source projects in the world.
+
+> **Fun Fact:** Git itself was built without Git.
+
+At its core, Git records how a project evolves over time. It preserves history, enables collaboration, and allows teams to experiment without losing control. Every change becomes part of a structured timeline rather than an informal sequence of file replacements.
+
+One of the defining characteristics of Git is that it is **distributed**, not centralized.
+
+> In modern engineering environments, Git is used to manage not only **application source code**, but also **infrastructure definitions and operational configuration** such as Kubernetes manifests, Terraform templates, CI/CD pipelines, and deployment scripts.
+Because Git provides a reliable history of change, many teams treat it as the **system of record for how their applications and infrastructure evolve over time**.
+
+---
+
+### Distributed Architecture
+
+A **Git repository** is a project directory tracked by Git that contains the project files along with their complete version history.
+
+Repositories can exist **locally on a developer’s machine** or **remotely on hosting platforms** such as GitHub, GitLab, or Bitbucket.
+
+In Git, every developer works with a **complete copy of the repository**, including the entire project history.
+
+Instead of relying on a single central server, developers typically clone a repository from a remote server. Each clone contains the full project history and functions as a complete Git repository.
+
+This architecture has several important implications:
+
+* **Full Repository Per Developer**
+  Each clone contains the complete history of the project, not just a working copy of files.
+
+* **Local Operations**
+  Most Git operations such as committing, branching, and inspecting history occur locally. This makes Git workflows fast and independent of network connectivity.
+
+* **Collaboration Through Synchronization**
+  Developers collaborate by synchronizing their local repositories with shared remote repositories using operations such as **push** and **pull**.
+
+This model allows teams to work independently while still sharing and integrating their changes.
+
+---
+
+### Snapshot-Based Version Control
+
+Git tracks changes using **snapshots of the project state**.
+
+Instead of storing line-by-line differences between files, Git records the **state of the entire project at a specific moment in time**. Each snapshot is called a **commit**.
+
+* **Each commit represents a project snapshot**
+* **Unchanged files are internally reused for efficiency**
+* **Any previous snapshot can be restored**
+
+This design makes it possible to safely experiment, revert changes, and understand how a project evolved over time.
+
+---
+
+## Git vs GitHub – Foundational Clarification
+
+There is persistent confusion between Git and GitHub. They are fundamentally different.
+
+**Git** is a distributed version control system. It is software that you install locally. It tracks file changes, manages history, enables branching and merging, and works independently of the internet.
+
+**GitHub** is a platform that hosts Git repositories and enables collaboration. It provides remote repository storage along with collaboration features such as pull requests, issue tracking, GitHub Actions (CI/CD), project boards, security scanning, release management, and access control.
+
+**Other Git hosting providers** include GitLab, Bitbucket, Azure Repos, AWS CodeCommit, Gitea, and Cloud Source Repositories (legacy in many environments).
+
+Git is the engine. GitHub is a hosted service built on top of Git.
+
+In this masterclass, we use GitHub as the remote server because it is the most widely adopted Git hosting platform.
+
+---
+
+## Installing Git
+
+Download Git from:
+
+[https://git-scm.com/install/](https://git-scm.com/install/)
+
+Verify installation:
+
+~~~bash
+git --version
+~~~
+
+Example output:
+
+~~~bash
+git version 2.53.0
+~~~
+
+If a version is displayed, Git is installed successfully.
+
+At this stage, Git is installed but not yet being used.
+
+---
+
+
+## What Is a Git Repository?
+
+A Git repository is a directory that Git has been instructed to track. It contains your project files along with a hidden `.git` directory that stores history, metadata, configuration, and internal state.
+
+In simple terms, **any directory initialized with Git becomes a Git repository**. Until initialization happens, Git treats the directory as an ordinary folder with no version tracking.
+
+Now let us see this practically.
+
+Create a new directory:
+
+~~~bash
+mkdir project-files
+cd project-files
+~~~
+
+Run:
+
+~~~bash
+git status
+~~~
+
+You will see:
+
+~~~bash
+fatal: not a git repository (or any of the parent directories): .git
+~~~
+
+This confirms that the directory has not yet been initialized as a Git repository.
+
+
+**Two Fundamental Concepts Revealed by the Error**
+
+1. **This Directory Is Not a Repository**: The current folder has not been initialized with Git. A repository is a directory that Git has been instructed to track. Git commands work meaningfully only inside such initialized directories. Not every folder on your system is automatically tracked; repositories must be created explicitly using `git init` (or cloned from an existing remote repository).
+
+2. **The `.git` Directory Is the Repository’s Brain**: When a directory is initialized, Git creates a hidden `.git` folder that stores commit history, configuration, object database, references, branch metadata, and internal state. If `.git` is deleted, Git loses all historical memory of the project even if the working files remain intact.
+
+---
+
+## Initializing a Repository
+
+Run:
+
+~~~bash
+git init
+~~~
+
+This initializes the current directory as a Git repository and creates the `.git` folder. Typically, `git init` is run once per project. If `.git` is deleted accidentally, you would need to initialize again, but previous history would be lost.
+
+Verify:
+
+~~~bash
+ls -la
+~~~
+
+You should see `.git`.
+
+You may inspect its structure:
+
+~~~bash
+tree .git
+~~~
+
+or
+
+~~~bash
+ls -R .git
+~~~
+
+Do not modify contents inside `.git` unless you deeply understand Git internals.
+
+Now run:
+
+~~~bash
+git status
+~~~
+
+You will see:
+
+~~~bash
+On branch master
+No commits yet
+nothing to commit (create/copy files and use "git add" to track)
+~~~
+
+
+**Important Observations**
+
+* You are **almost always on a branch**. The default branch may be `master` or `main` depending on Git version and configuration.
+* There are no commits yet.
+* The repository is initialized but currently empty and ready for tracking.
+
+> **Note:** In most workflows you are on a branch. However, there is a special condition called a **detached HEAD** state where you are temporarily not on any branch. We will cover this later in the course.
+
+You will frequently use **`git status`**. It shows the current branch, repository state, staged changes, untracked files, and overall working directory status.
+
+---
+
+#### Note About the Terminal Prompt
+
+You may notice that my terminal prompt shows **`(master)`** after running `git init`.
+
+Example:
+
+~~~
+┌-[varunjoshi@Varuns-MacBook-Pro]-[~/courses/Git-Masterclass/project-files](master)
+└─>
+~~~
+
+This happens because I have configured my **`~/.zshrc`** file to display the **currently active Git branch** in the terminal prompt.
+
+At this stage, we have not yet discussed **branches**, so you can safely ignore this detail for now. When we reach the **branches section later in the course**, this will make complete sense.
+
+---
+
+#### Optional: Configure Your Prompt to Show Git Branch
+
+If you are using **zsh**, you can add the following configuration to your `~/.zshrc` file to display the active Git branch in your prompt.
+
+~~~bash
+autoload -Uz vcs_info
+precmd() { vcs_info }
+setopt prompt_subst
+zstyle ':vcs_info:git:*' check-for-changes true
+zstyle ':vcs_info:git:*' formats '%F{214}(%b)%f'
+zstyle ':vcs_info:git:*' actionformats '%F{214}(%b|%a)%f'
+PS1=$'%F{5}┌-[%F{3}%n%F{5}@%F{36}%m%F{5}]-[%F{4}%~%F{5}]${vcs_info_msg_0_}\n%F{5}└─>%f '
+~~~
+
+After updating the file, reload the configuration:
+
+~~~bash
+source ~/.zshrc
+~~~
+
+Your terminal prompt will now display the **active Git branch automatically whenever you are inside a Git repository**.
+
+
+
+---
+
+# Git Architecture: Core Constructs
+
+![Alt text](/images/b1.png)
+
+Practically, Git workflows revolve around four core constructs. These define how data moves and how history is created.
+
+Although remote repositories are not technically part of Git’s internal architecture, they are included here because real-world engineering workflows almost always involve collaboration and CI/CD integration.
+
+---
+
+## 1) Working Directory
+
+The **working directory** is your project folder on disk where you create and modify files.
+
+Before running `git init`, the folder is simply a normal directory and Git has no knowledge of it.
+
+When you run `git init`, Git initializes the folder as a **repository** by creating the `.git` directory. From that point onward, the project folder becomes the **working directory that Git manages**.
+
+Any files and folders you create or modify exist in the working directory, but they are **not automatically tracked**. Git only begins tracking them after they are explicitly staged and committed.
+
+The lifecycle:
+
+~~~text
+Normal folder
+      ↓ git init
+Git repository (.git created)
+      ↓
+Working directory managed by Git
+      ↓
+git add → git commit
+~~~
+
+---
+
+## 2) Staging Area (Index)
+
+The **staging area**, also called the **index**, is an intermediate layer between your working directory and the repository history.
+
+It exists to give you precision and control over what goes into the next commit. Instead of committing everything in your working directory, you deliberately select the exact changes that should form the next snapshot.
+
+Move content into staging using:
+
+~~~bash
+git add <file>
+~~~
+
+or
+
+~~~bash
+git add .
+~~~
+
+This does not create history. It prepares the next snapshot.
+
+Think of the staging area as the **blueprint of the next commit**.
+
+---
+
+
+## What Is a Commit?
+
+![Alt text](/images/h1.png)
+
+Before moving further, it is essential to understand the commit, because the entire Git architecture revolves around it.
+
+A **commit** is an **immutable snapshot of your project at a specific point in time**. It captures the exact state of all **staged files** and records structured metadata including:
+
+* **Author name**
+* **Author email**
+* **Timestamp**
+* **Commit message**
+* **Reference to the parent commit**
+
+When your project reaches a meaningful state, such as completing a feature or fixing a bug, you create a commit to permanently preserve that state.
+
+> **Important:** A commit is **immutable and cannot be edited once created**, because it is identified by a content-based hash.
+> If changes are required, Git does **not modify the existing commit**. Instead, it creates a **new commit** or moves branch references (for example using `--amend` or `reset`, which we will see later in the course).
+> While commits can be removed from branch history, they are **never modified in place**.
+>
+> However, you can still modify files in your **working directory** (even if they originated from a previous commit) and record those changes as a **new commit**. The original commit remains unchanged, and the new commit represents an updated snapshot of the project.
+
+Commits are not independent entries in a list. Each commit stores a **reference to its parent commit**, creating a chain of commits over time. As development continues, these relationships form a **commit history graph** that represents how the project evolves.
+
+Git history is therefore **not simply a sequence of file versions**. Instead, it is a **graph of immutable snapshots connected through parent relationships**, which allows Git to model branching, merging, and parallel development efficiently.
+
+
+---
+
+## 3) Local Repository
+
+When you run:
+
+~~~bash
+git commit
+~~~
+
+Git converts the staged snapshot into a permanent commit and stores it inside `.git`.
+
+The **local repository** is the internal database maintained inside the `.git` directory. It contains:
+
+* Commits (snapshots)
+* Branch pointers
+* Tags
+* Object database (blobs, trees, commits)
+
+This is where history truly lives.
+
+---
+
+## 4) Remote Repository
+
+A **remote repository** is a Git repository hosted on a server for collaboration and integration purposes. Examples include GitHub, GitLab, Bitbucket, Azure Repos, AWS CodeCommit, and others.
+
+Remote repositories enable:
+
+* Team collaboration
+* Pull requests
+* CI/CD triggers
+* Centralized backup
+* Access control
+
+In this masterclass, we use GitHub as the remote server.
+
+---
+
+## The Core Workflow
+
+The complete logical flow looks like this:
+
+Working Directory → git add → Staging Area → git commit → Local Repository → git push → Remote Repository
+
+For now, focus on the local flow:
+
+Working Directory → git add → Staging Area → git commit → Local Repository
+
+History is created locally first. Remote interaction comes later.
+
+---
+
+## Practical Walkthrough
+
+Create a file:
+
+~~~bash
+touch file1.txt
+~~~
+
+Check the status:
+
+~~~bash
+git status
+~~~
+
+You will see:
+
+~~~text
+Untracked files:
+    file1.txt
+~~~
+
+The file exists in the working directory but is not tracked. Initializing a repository does not automatically track files. A file becomes tracked only after it is included in a commit.
+
+---
+
+
+## Stage the File
+
+~~~bash
+git add file1.txt
+~~~
+
+Check the status:
+
+~~~bash
+git status
+~~~
+
+Output:
+
+~~~text
+On branch master
+
+No commits yet
+
+Changes to be committed:
+  (use "git rm --cached <file>..." to unstage)
+        new file:   file1.txt
+~~~
+
+The file is now in the **staging area** and will be included in the next commit.
+
+Now modify the same file again:
+
+~~~bash
+echo "God is great" >> file1.txt
+~~~
+
+Check the status again:
+
+~~~bash
+git status
+~~~
+
+~~~text
+On branch master
+
+No commits yet
+
+Changes to be committed:
+  (use "git rm --cached <file>..." to unstage)
+        new file:   file1.txt
+
+Changes not staged for commit:
+  (use "git add <file>..." to update what will be committed)
+  (use "git restore <file>..." to discard changes in working directory)
+        modified:   file1.txt
+~~~
+
+This means Git now sees **two versions of the same file**:
+
+* The **version already staged** (ready for commit).
+* A **newer modified version in the working directory** that is not yet staged.
+
+If you want the latest changes to be included in the commit, stage the file again:
+
+~~~bash
+git add file1.txt
+~~~
+
+If instead you want to **discard the new modification and revert the file back to the staged version**, run:
+
+~~~bash
+git restore file1.txt
+~~~
+
+
+---
+
+## Create the First Commit
+
+Create a commit:
+
+~~~bash
+git commit -m "First commit: file1.txt added"
+~~~
+
+This creates a **permanent snapshot** in the **local repository**.
+
+Each commit also records **author metadata**, including **name, email, timestamp, and commit message**. If author identity is not configured, Git may attempt to auto-detect it or display a warning.
+
+---
+
+### Conventional Commits (Modern Standard)
+
+Many teams adopt the **Conventional Commits specification**, which standardizes commit messages to support **automated changelog generation, semantic versioning, and CI/CD workflows**.
+
+**General format**
+
+~~~
+<type>: <short description>
+~~~
+
+**Recommended length**
+
+* The **short description** should ideally be **≤ 50 characters**.
+* It should describe the change using the **imperative mood** (e.g., *add*, *fix*, *update*, not *added* or *fixed*).
+
+**Common commit types**
+
+* `feat:` → new feature
+* `fix:` → bug fix
+* `docs:` → documentation changes
+* `style:` → formatting or whitespace changes (no logic change)
+* `refactor:` → restructuring code without changing behavior
+* `test:` → adding or modifying tests
+* `chore:` → maintenance tasks (dependencies, tooling, build updates)
+
+**Examples**
+
+~~~text
+feat: add ArgoCD application deployment pipeline
+fix: resolve failing Terraform state lock issue
+chore: upgrade Kubernetes cluster to v1.29
+feat: implement password strength validation
+fix: prevent null pointer in user authentication service
+~~~
+
+> **Note: Why Does Git Have a Staging Area?**
+>
+> Git does not commit directly from the working directory because it prioritizes **precision and intentional history**.
+>
+> The staging area allows you to **select exactly which changes** should form the next commit. If you modify multiple files for different reasons, you can stage only the relevant ones and create clean, focused, atomic commits.
+>
+> Without staging, every commit would snapshot everything in the working directory, leading to messy, less meaningful history.
+>
+> In short, the staging area exists to ensure that commits represent **deliberate, well-constructed snapshots**, not accidental states of your workspace.
+
+---
+
+## Configuring Git Identity
+
+Git embeds author identity in every commit through `user.name` and `user.email`.
+
+Configure globally (recommended for personal machines):
+
+~~~bash id="d7mucq"
+git config --global user.name "Varun Joshi"
+git config --global user.email "cloudwithvarjosh@gmail.com"
+~~~
+
+Unset if necessary:
+
+~~~bash id="m1r15e"
+git config --global --unset user.name
+git config --global --unset user.email
+~~~
+
+---
+
+### Where Are Git Configuration Values Stored?
+
+Every time you run `git config`, Git writes the configuration to a file. The storage location depends on the scope flag used.
+
+#### Configuration Scope Flags
+
+* `--system` → Applies machine-wide for all users.
+  Stored in: `/etc/gitconfig` (or equivalent system-level config file).
+
+* `--global` → Applies to the current OS user across all repositories.
+  Stored in: `~/.gitconfig` or `~/.config/git/config`.
+
+* `--local` → Applies only to the current repository.
+  Stored in: `.git/config` inside that repository.
+
+* `--worktree` → Applies to a specific worktree (in multi-worktree setups).
+  Stored in: `.git/worktrees/<worktree-name>/config.worktree`.
+
+* `--file <path>` → Writes configuration directly to the file you specify.
+  Stored exactly at the custom path provided.
+
+> In practice, most Git configurations use the `--global` and `--local` scopes. The `--system`, `--worktree`, and `--file` options exist for specific or advanced use cases and are used less frequently.
+
+**Configuration Precedence**
+
+If the same key exists at multiple levels, Git resolves them in this order (highest to lowest priority):
+
+worktree → local → global → system
+
+The closest configuration to the repository wins.
+
+**Helpful Inspection Commands**
+
+You can see where a value is coming from using:
+
+~~~bash id="jv1v7h"
+git config --show-origin user.name
+~~~
+
+Or list all configuration with origins:
+
+~~~bash id="m28ceg"
+git config --list --show-origin
+~~~
+
+---
+
+## Viewing Commit History
+
+View full history:
+
+~~~bash
+git log
+~~~
+
+Compact view:
+
+~~~bash
+git log --oneline
+~~~
+
+Explore additional options:
+
+~~~bash
+git log -h
+~~~
+
+---
+
+## Committing Without `-m`
+
+Create another file and stage it:
+
+~~~bash
+touch file2.txt
+git add file2.txt
+~~~
+
+Now run:
+
+~~~bash
+git commit
+~~~
+
+Git opens your **default editor** (such as Vim, Nano, or VS Code) to enter a commit message.
+
+Example editor view:
+
+~~~
+# Please enter the commit message for your changes.
+# Lines starting with '#' will be ignored.
+~~~
+
+After writing the message and saving the file, Git creates the commit.
+
+This reinforces that **commit messages are mandatory**.
+
+Most engineers prefer:
+
+~~~bash
+git commit -m "descriptive message"
+~~~
+
+It is faster, script-friendly, and better suited for automated workflows.
+
+
+
+---
+
+
+## Ignoring Files with `.gitignore`
+
+During development, operating systems, programming languages, and tooling often generate files that **should not be tracked or included in version history**. These typically fall into two categories:
+
+1. **Sensitive files (security-related)**
+   Files that contain secrets or credentials, such as **API keys, tokens, private keys, and environment configuration files**.
+
+2. **Generated or environment-specific files**
+   Files automatically created by operating systems, build tools, or development environments, such as **log files, temporary files, build artifacts, and system-generated metadata**.
+
+Tracking such files can lead to **security risks, unnecessary repository size, and noisy commit history**.
+
+Git provides a mechanism to exclude such files from tracking using a **`.gitignore`** file.
+
+The `.gitignore` file defines patterns for files and directories that Git should **exclude when determining which untracked files to show and stage**.
+
+> **Important:** `.gitignore` only applies to **untracked files**. If a file is already tracked by Git, adding it to `.gitignore` will not stop Git from tracking it. To stop tracking such a file, it must first be removed from the index using:
+>
+> ```bash
+> git rm --cached <file>
+> ```
+
+#### Useful resources for working with `.gitignore`:
+
+1. A widely used repository of `.gitignore` templates for many languages and tools:
+   [https://github.com/github/gitignore](https://github.com/github/gitignore)
+
+2. You can also search for **"gitignore generator"**, which provides utilities that generate `.gitignore` files based on the technologies you use.
+
+3. Always **review generated `.gitignore` files carefully**, as they may ignore files that you actually want to track.
+
+---
+
+### Demo: Creating and Using `.gitignore`
+
+First create the `.gitignore` file:
+
+~~~bash
+touch .gitignore
+~~~
+
+Edit the file:
+
+~~~bash
+vim .gitignore
+~~~
+
+Example contents:
+
+~~~
+# Log files
+*.log
+
+# macOS system files
+.DS_Store
+
+# Secrets and private keys
+*.key
+*.pem
+*.env
+
+# Sensitive directory
+/sensitive/
+
+# Docker artifacts
+.docker/
+docker-compose.override.yml
+
+# Kubernetes generated files
+*.kubeconfig
+*.secret.yaml
+~~~
+
+These patterns instruct Git to **exclude matching files from being tracked**.
+
+Now create some files that match these patterns:
+
+~~~bash
+touch my.log
+touch my.key
+~~~
+
+Check the repository status:
+
+~~~bash
+git status
+~~~
+
+You will notice that **`.gitignore` appears as an untracked file**, but files such as **`my.log` and `my.key` do not appear** because Git is ignoring them.
+
+This happens because `.gitignore` itself is a **normal file that should be tracked in the repository**. By committing `.gitignore`, the ignore rules become part of the project so that **all collaborators follow the same rules about which files should not be tracked**.
+
+---
+
+## Branches in Git
+
+![Alt text](/images/c1.png)
+
+### Why Create a Branch?
+
+In real-world projects, applications, and microservices, there is always a **primary branch** (commonly named **main, master, trunk, release**, etc.).
+
+This branch represents the **latest stable and production-ready state of the codebase**. Since it contains working code, making direct changes to it is risky, as incomplete or untested changes can break the application.
+
+For this reason, in most production environments, the primary branch is **protected**:
+
+* Direct commits are **not allowed**
+* Changes must go through a **review process (Pull Request / Merge Request)**
+
+Instead of working directly on the primary branch, developers create **separate branches** (such as feature or bugfix branches) to implement changes in isolation.
+
+Once the changes are:
+
+* completed
+* tested
+* reviewed
+
+they are **merged back into the primary branch**, ensuring that only stable code is integrated.
+
+> **Branches enable isolated and parallel development without risking the stability of the primary codebase.**
+
+---
+
+### What is a Branch?
+
+A **branch** in Git represents an **independent line of development**.
+
+Internally, a branch is a **lightweight pointer to the latest commit (branch tip)**. When new commits are created, the branch pointer simply **moves forward** to the new commit.
+
+When a new branch is created, it points to the **same commit as the branch it was created from**. From that point onward, it evolves independently as new commits are added.
+
+Consider the following:
+
+* The `master` branch points to commit **C**, representing the latest state of the main line of development.
+* A new branch `feature/login` is created from commit **C**.
+
+```
+A --- B --- C   (master, feature/login)
+```
+
+At this moment, both branches point to the same commit.
+
+When new commits are added to `feature/login`:
+
+```
+A --- B --- C   (master)
+            \
+             D   (feature/login)
+```
+
+Now:
+
+* `master` remains at **C**
+* `feature/login` moves to **D**
+
+This shows that each branch evolves **independently**.
+
+> **Note: Branch Creation Does Not Duplicate Files**
+>
+> When a new branch is created, Git does **not copy project files or create a separate codebase**.
+> Instead, it creates a **new pointer to an existing commit**.
+>
+> In the example above, both `master` and `feature/login` initially pointed to commit **C**, meaning they shared the **exact same project state**.
+>
+> When commit **D** is created on `feature/login`, Git stores only the **new snapshot representing the changes introduced in that commit**. The branch pointer simply moves forward to this new commit.
+>
+> The underlying data (unchanged files and previous snapshots) is **shared internally**, not duplicated.
+>
+> > **Key idea:** Branching in Git is lightweight because it operates on **pointers and snapshots**, not on copying files or directories.
+
+
+> A branch is technically a pointer to the latest commit (often called the **branch tip**), and it always points to this tip. Conceptually, it represents an **independent line of development**.
+
+Branches enable teams to:
+
+* Develop features without breaking stable code
+* Fix bugs independently
+* Experiment safely
+* Work in parallel
+
+Once work is complete, changes are **merged back into the primary branch**, integrating that line of development.
+
+---
+
+
+### Common Branch Naming Conventions
+
+While Git does not enforce any naming rules, teams usually follow conventions to make branch purpose immediately clear.
+
+Common branch prefixes include:
+
+* **`feature/`** → new functionality
+  (e.g., `feature/login-system`, `feature/terraform-vpc-setup`)
+
+* **`bugfix/`** → non-critical bug fixes
+  (e.g., `bugfix/payment-calculation-error`, `bugfix/helm-values-misconfig`)
+
+* **`hotfix/`** → urgent production fixes
+  (e.g., `hotfix/login-crash`, `hotfix/eks-nodegroup-failure`)
+
+* **`release/`** → preparing a production release
+  (e.g., `release/v1.2.0`, `release/k8s-manifests-v2`)
+
+* **`experiment/`** or **`spike/`** → short-lived experiments or investigations
+  (e.g., `experiment/graphql-adoption`, `spike/argo-rollouts-evaluation`)
+
+* **`chore/`** → maintenance tasks such as dependency upgrades
+  (e.g., `chore/update-spring-boot-version`, `chore/upgrade-terraform-modules`)
+
+These conventions help teams quickly understand the **intent and lifecycle of a branch**.
+
+Once work on a branch is complete, the changes can later be **merged back into the primary branch**.
+We will discuss **what merging means and how it works shortly**.
+
+
+---
+
+## Visualizing Branches
+
+![Alt text](/images/d1.png)
+
+In our earlier demos, the repository started with a branch called **`master`**, which has historically been the default name used by Git.
+
+> In the diagrams below, **letters represent commits** and the branch name shows **which commit the branch currently points to**.
+
+Development typically begins on the primary branch:
+
+~~~text
+A --- B --- C   (master)
+~~~
+
+In this diagram:
+
+* `A`, `B`, and `C` represent **commits**.
+* Each commit is a **snapshot of the project at a specific point in time**.
+* The branch name `master` is simply a **pointer to the latest commit**.
+
+When new commits are made, the branch pointer moves forward.
+
+---
+
+
+### Creating a Feature Branch
+
+Instead of modifying the primary branch directly, developers typically create a **feature branch**.
+
+> **Remember:** a branch is not a folder or copy of the code. It is simply a pointer to the latest commit in that line of development.
+
+> **Note:** You might ask: *Why create a new branch at all? Why not simply continue working on `master`?*
+> The reason is safety and stability. The primary branch usually represents the **currently working version of the application**. Any change such as a new feature, bug fix, or experiment requires modifying the codebase. By performing that work on a **separate branch**, developers ensure that the known working version remains untouched until the new changes are ready and validated. This prevents unfinished or unstable work from disrupting the main code.
+
+~~~
+A --- B --- C   (master)
+            \
+              D --- E   (feature/login)
+~~~
+
+What happened here:
+
+* A new branch **`feature/login`** was created from commit `C`.
+* Development continues on that branch.
+* The **primary branch remains unchanged**.
+
+This allows teams to **build new functionality without risking the stability of the main codebase**.
+
+---
+
+### Parallel Development
+
+Now suppose another engineer fixes a bug at the same time.
+
+```
+A --- B --- C --- F   (master)
+           |\
+           | D --- E   (feature/login)
+           |
+           G --- H     (bugfix/typo)
+```
+
+This diagram shows **parallel development**:
+
+* `feature/login` contains commits `D` and `E` implementing the login feature.
+* `bugfix/typo` contains commits `G` and `H` fixing a small typo in the code or documentation.
+* `master` continues evolving independently with commit `F`.
+
+Both branches originated from **commit `C`**, meaning they started from the **same project state**.
+
+This demonstrates how multiple developers can work on **different tasks simultaneously**, without interfering with each other’s work.
+
+> **Key idea:** Branches enable independent lines of development, allowing teams to work in parallel without impacting the stability of other work.
+
+
+> **Why create separate branches from the same commit?**
+> Each branch represents a **separate unit of work**, allowing changes to be developed, tested, and reviewed independently.
+
+> **Note:** In this example we are working with a **local repository**, where commits can be made directly to `master`.
+> In collaborative environments using platforms like GitHub, GitLab, or Bitbucket, the primary branch is often **protected**, and changes are integrated through feature branches and pull requests.
+> We will discuss **how branches are merged back into the primary branch** shortly.
+
+---
+
+## Atomic Development in Git
+
+In Git, both **commits** and **branches** are most effective when they represent **small, focused units of work**.
+
+This principle is known as **atomic development**.
+
+An **atomic change** is a **single, self-contained, and logically complete unit of work** that can be:
+
+* understood independently
+* reviewed independently
+* tested independently
+* reverted independently
+
+Atomicity applies at two levels:
+
+* **Atomic commits** → each commit represents one logical change
+* **Atomic branches** → each branch represents one logical task
+
+---
+
+#### Atomic Commits
+
+| Do (Atomic)                                   | Don’t (Non-Atomic)                              |
+| --------------------------------------------- | ----------------------------------------------- |
+| `feat: add user login API`                    | `feat: login + payment + UI changes`            |
+| `fix: handle null pointer in payment service` | `fix: multiple random bug fixes`                |
+| `feat: add Kubernetes deployment manifest`    | `feat: infra + app + config changes together`   |
+| `fix: correct Terraform security group rule`  | `fix: networking + IAM + logging in one commit` |
+
+---
+
+#### Atomic Branches
+
+| Do (Atomic)                    | Don’t (Non-Atomic)                 |
+| ------------------------------ | ---------------------------------- |
+| `feature/login-system`         | `feature/login-and-payment-and-ui` |
+| `bugfix/payment-timeout`       | `bugfix/multiple-issues`           |
+| `feature/terraform-vpc-setup`  | `feature/full-infra-setup`         |
+| `bugfix/helm-values-misconfig` | `bugfix/k8s-and-terraform-and-ci`  |
+
+---
+
+#### Why Atomic Matters
+
+Keeping work atomic provides several benefits:
+
+* easier debugging (identify exactly what broke)
+* clearer project history (each change has a purpose)
+* simpler code reviews (focused and faster reviews)
+* safer reverts (rollback specific changes without side effects)
+
+For example, if a **feature implementation** and a **bug fix** are combined into a single commit or branch, and something breaks, it becomes difficult to isolate the root cause.
+
+By keeping changes atomic, each unit of work remains **independent, traceable, and easy to manage**.
+
+> **Key idea:** One branch, one purpose. One commit, one logical change.
+
+
+---
+
+## Demo: Working with Branches (Commands)
+
+### Step 1: Check Existing Branches
+
+First, check which branches currently exist in the repository.
+
+~~~bash
+git branch
+~~~
+
+Example output:
+
+~~~
+* master
+~~~
+
+The `*` indicates the **current branch** you are working on.
+
+At this stage the repository has **only one branch**, called `master`.
+
+---
+
+### Step 2: Create Baseline Commit History
+
+Before demonstrating branching, let’s create a few commits so that our repository has some history.
+
+Think of these commits as representing the **initial development of a simple application** before new feature work begins.
+
+~~~bash
+echo "Application initialized" > app.txt
+git add app.txt
+git commit -m "chore: initialize application"
+
+echo "Updated application header styling" >> app.txt
+git add app.txt
+git commit -m "style: improve application header styling"
+
+echo "Added footer section to application" >> app.txt
+git add app.txt
+git commit -m "feat: add footer section"
+~~~
+
+Conceptually the repository now looks like:
+
+~~~
+A --- B --- C   (master)
+~~~
+
+Each letter represents a **commit snapshot of the project**.
+
+In this example:
+
+* **A** → application initialization
+* **B** → cosmetic improvement to the UI
+* **C** → footer feature added
+
+Commit **C** represents the **current stable state of the application**, and new development will branch off from this point.
+
+---
+
+### Step 3: Create and Switch to a Feature Branch (Understanding `HEAD`)
+
+When starting new work, developers usually create a **feature branch**.
+
+Create and switch to a branch in one command:
+
+~~~bash
+git checkout -b feature/login
+~~~
+
+Verify the branches:
+
+~~~bash
+git branch
+~~~
+
+Example output:
+
+~~~
+* feature/login
+  master
+~~~
+
+The `*` indicates the **current branch**.
+
+At this moment both `master` and `feature/login` **point to the same commit**.
+
+~~~
+A --- B --- C   (master, feature/login)
+~~~
+
+This means both branches currently contain **exactly the same project state**.
+
+> **Note: Creating a Branch from a Specific Commit**
+>
+> By default, when you run `git checkout -b <branch-name>`, Git creates the branch from the **current commit (where `HEAD` is pointing)**, which is typically the latest commit on the current branch.
+>
+> However, you can create a branch from **any specific commit** by providing a commit reference:
+>
+> ```bash
+> git checkout -b <branch-name> <commit-id>
+> ```
+>
+> For example, to create a branch from commit **B**:
+>
+> ```bash
+> git checkout -b feature/legacy-fix <commit-id-of-B>
+> ```
+>
+> Conceptually:
+>
+> ```
+> A --- B --- C   (master)
+>       \
+>        D   (feature/legacy-fix)
+> ```
+>
+> In this case:
+>
+> * `feature/legacy-fix` starts from **B**, not the latest commit **C**
+>
+> * the new branch represents a **different line of development from an earlier point in history**
+>
+> > **Key idea:** A branch can be created from **any commit in the history**, not just the latest one.
+
+---
+
+
+#### Common Branch Commands
+
+Below are some commonly used commands when working with branches.
+
+```bash
+# Create a new branch
+git branch <branch-name>
+
+# Switch to an existing branch
+git checkout <branch-name>
+
+# Create and switch to a new branch
+git checkout -b <branch-name>
+
+# Rename the current branch
+git branch -m <new-branch-name>
+
+# Delete a branch (safe delete)
+git branch -d <branch-name>
+
+# Force delete a branch
+git branch -D <branch-name>
+```
+
+> **Note:** `git branch -d` performs a **safe delete** and will fail if the branch contains commits that have not been merged, preventing accidental data loss.
+> `git branch -D` performs a **force delete**, removing the branch even if it has unmerged commits. This is typically used when:
+>
+> * the branch is no longer needed
+> * the work is incomplete or discarded
+> * the changes exist elsewhere or are intentionally abandoned
+>
+> Use `-D` with caution, as unmerged commits may become harder to recover.
+
+
+---
+
+#### Understanding `HEAD`
+
+In Git, there is a special pointer called **`HEAD`**.
+
+`HEAD` represents your **current position in the repository**.
+
+In most situations, **`HEAD` points to the currently checked-out branch**, and that branch points to the **latest commit (tip) of that branch**.
+
+Conceptually:
+
+```
+HEAD → branch → latest commit
+```
+
+This indirection allows Git to:
+
+* know **which branch you are currently working on**
+* determine **where new commits should be added**
+* move the correct **branch pointer when a commit is created**
+
+For example, after creating and switching to `feature/login`:
+
+```
+A --- B --- C   (master, feature/login)
+                 ↑
+           HEAD → feature/login
+```
+
+At this moment:
+
+* `master` points to commit **C**
+* `feature/login` also points to commit **C**
+* `HEAD` points to the **`feature/login` branch**
+
+Even though both branches currently point to the same commit, `HEAD` tells Git **which branch you are actively working on**.
+
+When a new commit is created:
+
+* the **current branch pointer moves forward**
+* `HEAD` remains attached to that branch
+
+As a result, the new commit becomes the **latest commit (branch tip)** of that branch.
+
+If you run:
+
+```bash
+git log
+```
+
+Git shows the commit history starting from the **current branch that `HEAD` points to**.
+
+Since both branches currently point to the same commit, the history will look identical.
+
+If you want to visualize commits across **all branches**, you can run:
+
+```bash
+git log --oneline --graph --all
+```
+
+This command shows the **entire commit graph**, including commits that exist on other branches.
+
+> **Note:** In a special situation called a **detached HEAD**, `HEAD` points **directly to a commit instead of a branch**. We will discuss this later.
+
+---
+
+#### What happens when a new commit is created?
+
+When a new commit is created on `feature/login`, both the branch pointer and `HEAD` move forward.
+
+~~~
+A --- B --- C   (master)
+            \
+             D   (feature/login)
+                  ↑
+                HEAD
+~~~
+
+Now:
+
+* `master` still points to **C**
+* `feature/login` points to **D**
+* `HEAD` points to the **latest commit on the current branch**
+
+> In most situations, `HEAD` simply points to the latest commit of the branch you have checked out.
+> There is also a concept called **detached HEAD**, which we will discuss later.
+
+In the **next step**, we will create a commit on the `feature/login` branch and observe **how the branch pointer and `HEAD` move forward**.
+
+---
+
+### Step 4: Add Work on the Feature Branch
+
+Now we begin implementing the **login feature**, which is why we created the `feature/login` branch.
+
+Create a new file and commit the change:
+
+~~~bash
+git checkout feature/login
+echo "Login feature implementation started" > login.txt
+git add login.txt
+git commit -m "feat: implement login functionality"
+~~~
+
+When this commit is created, Git records a **new snapshot of the project**.
+
+Conceptually the repository now looks like:
+
+~~~
+A --- B --- C   (master)
+            \
+             D   (feature/login)
+~~~
+
+Commit **D** represents the new change introduced by the login feature.
+
+This commit exists **only on the `feature/login` branch**, while the `master` branch continues to point to commit **C**.
+
+---
+
+### How `HEAD` moves
+
+In the previous step we introduced the concept of **`HEAD`**.
+
+When we created commit **D**, two things happened:
+
+* `feature/login` moved forward to **D**
+* `HEAD` also moved forward to **D**
+* `master` remained at **C**
+
+Conceptually:
+
+~~~
+A --- B --- C   (master)
+            \
+             D   (feature/login)
+                  ↑
+                HEAD
+~~~
+
+This demonstrates an important Git behavior:
+
+> When a commit is created, the **current branch pointer and `HEAD` both move forward to the new commit**.
+
+---
+
+### Visualizing the Commit History
+
+You can visualize the commit graph using:
+
+~~~bash
+git log --oneline --graph --decorate --all
+~~~
+
+Example output:
+
+~~~
+* D (HEAD -> feature/login) feat: implement login functionality
+* C (master) feat: add footer section
+* B style: improve application header styling
+* A chore: initialize application
+~~~
+
+Notice how:
+
+* `HEAD` points to **feature/login**
+* `feature/login` points to commit **D**
+* `master` still points to commit **C**
+
+This shows that **development on the feature branch is isolated from the primary branch**.
+
+---
+
+### Step 5: Switch Back to the Master Branch
+
+Switch back to the primary branch:
+
+~~~bash
+git checkout master
+~~~
+
+Now check the files in the working directory:
+
+~~~bash
+ls
+~~~
+
+Output:
+
+~~~
+app.txt
+~~~
+
+Notice that **`login.txt` is not present**.
+
+This is because that file was created in a commit that exists **only on the `feature/login` branch**.
+
+Switch back to the feature branch:
+
+~~~bash
+git checkout feature/login
+~~~
+
+Check again:
+
+~~~bash
+ls
+~~~
+
+Output:
+
+~~~
+app.txt
+login.txt
+~~~
+
+> When you switch branches, Git updates the working directory to match the commit that the branch points to.
+
+> “Git did not delete the file. We simply switched to a branch where that commit does not exist.”
+
+---
+
+
+
+## Git Merge
+
+![Alt text](/images/e1.png)
+
+In Git, development work typically happens on **separate branches**. Once that work is complete and validated, the changes must be **integrated back into the primary branch**.
+
+This integration process is called **merging**.
+
+A merge integrates the **commit history of one branch into another**, bringing the commits from the source branch into the target branch.
+
+In most workflows, the **primary branch (`main`, `master`, or another team-defined name)** represents the stable line of development, while features, fixes, or experiments are implemented in separate branches.
+
+When the work is ready, it is **merged back into the primary branch**.
+
+> **Important:** Merging integrates histories; it does **not rewrite existing commits**.
+
+---
+
+### Example Scenario
+
+Suppose development happened on the `feature/login` branch.
+
+~~~
+A --- B --- C   (master)
+            \
+             D   (feature/login)
+~~~
+
+Commit **D** contains the login feature implementation.
+
+When performing a merge, the **currently checked-out branch is the *target* branch** (the branch that will receive the changes), and the branch specified in the `git merge` command is the **source** branch (the branch whose commits will be integrated).
+
+In this example:
+
+* **Target branch:** `master`
+* **Source branch:** `feature/login`
+
+> Different platforms use slightly different terminology for these roles, but the concept is always the same: **changes flow from the source branch into the target branch**.
+
+| Concept                      | Git           | GitHub                | GitLab        | Bitbucket          |
+| ---------------------------- | ------------- | --------------------- | ------------- | ------------------ |
+| Branch receiving the changes | Target branch | Base branch           | Target branch | Destination branch |
+| Branch providing the changes | Source branch | Head / Compare branch | Source branch | Source branch      |
+
+In our example:
+
+* **Target branch:** `master` (the branch that will receive the changes)
+* **Source branch:** `feature/login` (the branch whose commits will be integrated)
+
+To integrate this work into the primary branch, first switch to the branch that will **receive the changes**.
+
+~~~bash
+git checkout master
+~~~
+
+Then run the merge:
+
+~~~bash id="qsbpqq"
+git merge feature/login
+~~~
+
+This tells Git to **merge the commits from `feature/login` (source) into `master` (target)**.
+
+What happens next depends on **how the branch histories relate to each other**.
+
+Git supports multiple **merge strategies**. The two most common outcomes in day-to-day development are:
+
+1. **Fast-forward merge**
+2. **Three-way merge**
+
+> **Note 1:** Git also supports other merge strategies such as **octopus**, **ours**, and **subtree**, which are used in more specialized workflows. In this masterclass we focus on **fast-forward** and **three-way merges** because they represent the majority of real-world merge scenarios and help build the core mental model of how Git integrates changes.
+
+> **Note 2:** Git also provides other ways of **integrating changes**, such as **rebasing** and **squashing commits**. These techniques modify commit history instead of creating traditional merge commits and are commonly used in modern development workflows. We will explore **rebase and squash in Part 2 of this Git Masterclass**.
+
+
+---
+
+## Understanding Branch Divergence
+
+Before discussing merge types, it is important to understand **branch divergence**.
+
+**Branch divergence occurs when both branches introduce new commits after their common ancestor.**
+> **Note:** The **common ancestor** is the **most recent commit reachable from both branch tips**.
+
+In other words, each branch continues development **independently from the same starting point**, creating two separate lines of history.
+
+The commit where the branches originally split is called the **common ancestor**.
+
+---
+
+#### Case 1: No Branch Divergence
+
+~~~text
+A --- B --- C   (master)
+            \
+             D --- E   (feature/login)
+~~~
+
+Here:
+
+* both branches share commit **C**, which is their **common ancestor**
+* `feature/login` introduced commits **D** and **E**
+* `master` did **not** introduce any new commits after **C**
+
+Since `master` has not moved forward, the `master` branch is still an **ancestor** of `feature/login`.
+
+Because of this relationship, Git can simply **move the `master` branch pointer forward** to commit **E**.
+
+This operation is called a **fast-forward merge**.
+
+Result:
+
+~~~text
+A --- B --- C --- D --- E   (master, feature/login)
+~~~
+
+No new commit is created. Git simply advances the branch pointer.
+
+---
+
+#### Case 2: Branch Divergence
+
+~~~text
+A --- B --- C --- F   (master)
+            \
+             D --- E   (feature/login)
+~~~
+
+Here:
+
+* both branches share commit **C**, their **common ancestor**
+* `feature/login` introduced commits **D** and **E**
+* `master` introduced commit **F**
+
+Since **both branches have progressed independently after commit C**, their histories have **diverged**.
+
+In this situation:
+
+* `master` is **not an ancestor** of `feature/login`
+* `feature/login` is **not an ancestor** of `master`
+
+Because of this, Git cannot simply move a branch pointer forward.
+Instead, Git must **combine the histories of both branches**, which results in a **three-way merge**.
+
+---
+
+
+## 1. Fast-Forward Merge
+
+A **fast-forward merge** occurs when the **target branch has not diverged from the source branch**.
+
+In this situation, **only one branch has introduced new commits**, while the other branch has remained unchanged since the branching point.
+
+Example:
+
+~~~
+A --- B --- C   (master)
+            \
+             D   (feature/login)
+~~~
+
+Here:
+
+* both branches share the same history up to commit **C**
+* only `feature/login` introduced a new commit **D**
+* `master` has **not created any new commits**
+
+Because `master` has not moved forward, it is still an **ancestor** of `feature/login`.
+
+Git can therefore **move the `master` branch pointer forward** to commit **D**.
+
+After the merge:
+
+~~~
+A --- B --- C --- D   (master, feature/login)
+~~~
+
+No new commit is created.
+
+Git simply **advances the `master` branch pointer to the latest commit of the source branch**.
+
+This makes commit **D** (and any subsequent commits on `feature/login`) part of the `master` history.
+
+> **Important:** Git does not move or copy commits during a merge.
+> The commits already exist in the repository. Git simply updates the **branch pointer**, making those commits reachable from the target branch.
+
+This is called a **fast-forward merge** because the branch pointer moves forward along the existing commit path.
+
+Fast-forward merges are:
+
+* simple
+* clean
+* common when feature branches are short-lived
+
+You can verify the history using:
+
+~~~bash
+git log --oneline --graph --decorate
+~~~
+
+Example output:
+
+~~~
+* D (HEAD -> master, feature/login) feat: implement login functionality
+* C feat: add footer section
+* B style: improve application header styling
+* A chore: initialize application
+~~~
+
+---
+
+### Step 6: Perform a Fast-Forward Merge (Feature Branch)
+
+To merge a branch, you must first switch to the **branch that will receive the changes**.
+
+In this case, we want to merge the feature branch into `master`, so we must first switch to the `master` branch.
+
+```bash
+git checkout master
+```
+
+Now merge the feature branch:
+
+```bash
+git merge feature/login
+```
+
+Before the merge:
+
+```
+A --- B --- C   (master)
+            \
+             D   (feature/login)
+```
+
+Because the `master` branch has **not moved forward since the feature branch was created**, Git can simply move the branch pointer forward.
+
+After the merge:
+
+```
+A --- B --- C --- D   (master, feature/login)
+```
+
+Git moved the `master` pointer forward to commit **D**.
+No new commit was created.
+
+This type of merge is called a **fast-forward merge**.
+
+---
+
+#### Inspecting the Commit History
+
+Now inspect the commit history:
+
+```bash
+git log --oneline --all
+```
+
+Example output:
+
+```
+2095baa (HEAD -> master, feature/login) feat: implement login functionality
+0cea834 feat: add footer section
+7ccf27b style: improve application header styling
+ee3a7a6 chore: initialize application
+```
+
+Notice that both **`master` and `feature/login` now point to the same commit**.
+
+This happened because Git **moved the `master` branch pointer forward** to the latest commit that already existed on the `feature/login` branch.
+
+From the perspective of the commit history, it now looks like the commits were always part of a single linear history.
+
+---
+
+#### Why `git log` Does Not Show the Merge
+
+You may notice that `git log` **does not explicitly show that a merge occurred**.
+
+This is because **no new commit was created during a fast-forward merge**. Git simply **moved the branch pointer forward**, so the history remains linear.
+
+To see the actual repository activity, including pointer movements, we can use **`git reflog`**.
+
+---
+
+#### Inspecting Repository Activity with `git reflog`
+
+Run:
+
+```bash
+git reflog
+```
+
+Example output:
+
+```
+2095baa (HEAD -> master, feature/login) HEAD@{0}: merge feature/login: Fast-forward
+0cea834 HEAD@{1}: checkout: moving from feature/login to master
+2095baa (HEAD -> master, feature/login) HEAD@{2}: commit: feat: implement login functionality
+0cea834 HEAD@{3}: checkout: moving from master to feature/login
+0cea834 HEAD@{4}: checkout: moving from feature/login to master
+0cea834 HEAD@{5}: checkout: moving from master to feature/login
+0cea834 HEAD@{6}: commit: feat: add footer section
+7ccf27b HEAD@{7}: commit: style: improve application header styling
+ee3a7a6 HEAD@{8}: commit (initial): chore: initialize application
+```
+
+Unlike `git log`, which shows the **commit history**, `git reflog` records the **history of reference movements**, including:
+
+* commits
+* checkouts
+* merges
+* resets
+* rebases
+* movements of `HEAD`
+
+Here you can clearly see the fast-forward merge:
+
+```
+HEAD@{0}: merge feature/login: Fast-forward
+```
+
+This entry confirms that Git **performed a fast-forward merge by moving the `master` branch pointer to the latest commit of `feature/login`**.
+
+---
+
+#### Cleaning Up the Feature Branch
+
+Once a feature branch has been merged, it is usually safe to delete it.
+
+```bash
+git branch -d feature/login
+```
+
+This removes the **branch pointer**, but **does not remove the commits**, because they are now part of the `master` history.
+
+---
+
+
+## 2. Three-Way Merge (True Merge)
+
+A **three-way merge** occurs when **branch divergence exists**.
+
+This means **both branches created new commits independently after their common ancestor**.
+
+Consider the following scenario:
+
+~~~
+A --- B --- C --- F   (master)
+            \
+             D --- E   (feature/login)
+~~~
+
+Here:
+
+* the `feature/login` branch contains commits **D** and **E**
+* the `master` branch has advanced with commit **F**
+
+Since the histories have **diverged**, Git cannot perform a fast-forward merge.
+
+Instead, Git performs a **three-way merge**.
+
+This merge strategy is called *three-way* because Git compares **three commits that represent three states of the project**:
+
+1. the **common ancestor commit**
+   This is the **most recent commit shared by both branches**, representing the last point where their histories were identical.
+
+2. the **latest commit on the current branch (`HEAD`)**
+   This represents the **current state of the target branch** (the branch you have checked out).
+
+3. the **latest commit on the branch being merged**
+   This represents the **current state of the incoming (source) branch**.
+
+These three commits allow Git to understand how each branch has **changed relative to the common ancestor**.
+
+> **Note:** Git does not compare branches directly. It compares the **states captured by these commits**.
+> Each commit represents a **complete snapshot of the project at that point in time**, which already includes all changes from its parent commits.
+>
+> Because of this, Git only needs:
+>
+> * the **common ancestor** (baseline)
+> * the **latest commit on each branch** (final states)
+>
+> Using these three points, Git determines:
+>
+> * what changed in the current branch
+> * what changed in the incoming branch
+> * how to combine those changes into a unified result
+
+The **common ancestor commit** is the **most recent commit shared by both branches**. In this example, that commit is **`C`**.
+
+Git uses this commit as the **baseline** to understand how each branch has changed the project.
+
+So the three inputs used in the merge are:
+
+* the **common ancestor commit** (`C`)
+* the **latest commit on `master`** (`F`)
+* the **latest commit on `feature/login`** (`E`)
+
+By comparing these three snapshots, Git determines how to combine the changes made in each branch.
+
+Git then creates a **new merge commit** that integrates both histories.
+
+Run:
+
+~~~bash
+git checkout master
+git merge feature/login
+~~~
+
+Result:
+
+~~~
+A --- B --- C --- F -------- G   (master)
+            \             /
+             D --- E ----     (feature/login)
+~~~
+
+Commit **G** is called a **merge commit**.
+
+It has **two parent commits**, representing the integration of both lines of development.
+
+The merge commit preserves the complete development history of both branches.
+
+> After the merge, the `master` branch contains a **merge commit (`G`)**, and through that merge commit it now has access to the commits created on the `feature/login` branch (`D` and `E`).
+> In total, the history reachable from `master` now includes **seven commits**.
+
+> **Important:** All commits from the `feature/login` branch (**D** and **E**) remain unchanged and become part of the `master` history.
+> The merge operation simply creates **one additional commit (`G`)** that connects the two histories.
+
+---
+
+### Step 7: Create Branch Divergence to Demonstrate a True Merge
+
+To demonstrate a **three-way merge**, both branches must contain **new commits**.
+
+At this stage, we will create a **new branch representing a bug fix**, and then introduce new commits on both branches so that their histories **diverge**.
+
+Recall that earlier we merged the `feature/login` branch into `master` using a **fast-forward merge**.
+That operation moved the `master` branch pointer forward to commit **D**, which represents the login feature.
+
+So our repository currently looks like this:
+
+```
+A --- B --- C --- D   (master)
+```
+
+Commit **D** is now the **latest commit on `master`**, and it represents the **current stable state of the application**.
+
+---
+
+#### Create the Bugfix Branch
+
+First ensure we are on the primary branch.
+
+```bash
+git checkout master
+```
+
+Now create the bugfix branch and switch to it:
+
+```bash
+git checkout -b bugfix/typo
+```
+
+Verify the branches:
+
+```bash
+git branch
+```
+
+Example output:
+
+```
+* bugfix/typo
+  master
+```
+
+At this moment both branches point to the **same commit (`D`)**.
+
+Conceptually the repository looks like this:
+
+```
+A --- B --- C --- D   (master, bugfix/typo)
+```
+
+> Creating a branch does **not copy code or create a commit**.
+> It simply creates a **new pointer to an existing commit**.
+
+From this point onward, when new commits are created, **only the branch where the commit is made will move forward**, causing the histories to diverge.
+
+---
+
+#### Add Work on the Bugfix Branch
+
+Now create a commit representing a bug fix.
+
+```bash
+echo "Corrected typo in footer" > bugfix.txt
+git add bugfix.txt
+git commit -m "fix: correct footer typo"
+```
+
+Now the repository looks like:
+
+```
+A --- B --- C --- D   (master)
+                   \
+                    E   (bugfix/typo)
+```
+
+The bugfix branch has moved forward with a new commit.
+
+---
+
+#### Add New Work on the Master Branch
+
+Now switch back to the primary branch.
+
+```bash
+git checkout master
+```
+
+Create another commit representing additional work.
+
+```bash
+echo "Improved footer spacing" > layout.txt
+git add layout.txt
+git commit -m "style: improve footer spacing"
+```
+
+Now the branches have **diverged**.
+
+```
+A --- B --- C --- D --- F   (master)
+                   \
+                    E   (bugfix/typo)
+```
+
+Both branches have progressed independently after commit **D**, which creates **branch divergence**.
+
+Because the branches modified **different files**, Git will be able to **merge them automatically without conflicts**.
+
+In the next step, we will integrate these changes using a **three-way merge**.
+
+---
+
+### Step 8: Perform a Three-Way Merge
+
+To integrate the bugfix branch into the primary branch, switch to the branch that will **receive the changes**.
+
+```bash
+git checkout master
+```
+
+Now merge the bugfix branch:
+
+```bash
+git merge bugfix/typo
+```
+
+Before the merge:
+
+```
+A --- B --- C --- D --- F   (master)
+                   \
+                    E   (bugfix/typo)
+```
+
+Since **both branches introduced new commits after their common ancestor (`D`)**, Git cannot perform a fast-forward merge.
+
+Instead, Git performs a **three-way merge**.
+
+Git compares three snapshots of the project:
+
+1. **common ancestor** → `D`
+2. **latest commit on `master`** → `F`
+3. **latest commit on `bugfix/typo`** → `E`
+
+Git then determines how each branch changed the project relative to the common ancestor and combines those changes.
+
+---
+
+#### Merge Commit Message Prompt
+
+Right after you run the merge command, Git will open your **default editor** to allow you to enter the **merge commit message**.
+
+You will typically see something like this:
+
+```
+Merge branch 'bugfix/typo'
+```
+
+This message is already provided by Git because it clearly describes what the merge is doing.
+
+You may:
+
+* **accept the default message**, or
+* **modify it and add additional context**
+
+In most cases, the **default message is quite intuitive**, and you will commonly see it used in real repositories.
+
+Once you save and exit the editor, Git completes the merge.
+
+---
+
+#### After the Merge
+
+After the merge completes, the repository history looks like this:
+
+```
+A --- B --- C --- D --- F -------- G   (master)
+                   \               /
+                    E -------------
+```
+
+Commit **G** is the **merge commit**.
+
+It has **two parent commits**, which represent the two histories that were combined:
+
+* `F` from the `master` branch
+* `E` from the `bugfix/typo` branch
+
+This merge commit preserves the **complete development history of both branches**.
+
+Because the branches modified **different files**, Git was able to merge them **automatically without conflicts**.
+
+---
+
+#### Verify the Merge Commit
+
+We can verify that a merge commit was created by inspecting the commit history.
+
+Run:
+
+```bash
+git log --oneline
+```
+
+Example output:
+
+```
+83abaa1 Merge branch 'bugfix/typo'
+ec4a6a0 style: improve footer spacing
+f7d93c9 fix: correct footer typo
+1d2ac28 feat: implement login functionality
+```
+
+Notice that the **latest commit is the merge commit**.
+
+This confirms that Git created a **new commit to combine the histories of the two branches**.
+
+---
+
+#### Visualizing the Commit Graph
+
+You can also visualize the repository history as a **commit graph**.
+
+Run:
+
+```bash
+git log --oneline --graph
+```
+
+Example output:
+
+```
+*   e19bec5 (HEAD -> master) Merge branch 'bugfix/typo'
+|\
+| * 50e2b66 (bugfix/typo) fix: correct footer typo
+* | 7651f2e style: improve footer spacing
+|/
+* 43428af feat: implement login functionality
+* 58b133f feat: add footer section
+* 09adfd8 style: improve application header styling
+* 0bfc4bc chore: initialize application
+```
+
+This output provides a **text-based visualization of the commit graph**, showing how branches diverged and were later merged.
+
+**Outout Explanation**:
+
+* Commits are shown from **newest to oldest**, so the **top-most commit is the most recent**.
+* Each `*` represents a **commit node** in the history graph.
+* The first line:
+
+  ```
+  *   e19bec5 (HEAD -> master) Merge branch 'bugfix/typo'
+  ```
+
+  shows the **latest commit**, which is a **merge commit**.
+* `(HEAD -> master)` means:
+
+  * `HEAD` is currently pointing to the `master` branch
+  * `master` points to commit `e19bec5`
+  * therefore, this is the **current state of the repository**
+* The message **“Merge branch 'bugfix/typo'”** indicates that this commit was created by merging another branch into `master`.
+    > **Note:** In this example, the merge commit message (`-m`) was written explicitly to indicate a merge. In practice, messages may not always be this clear. You can still identify a merge commit by the graph structure (a commit with two parent lines converging). For confirmation, you can inspect `git reflog` or use `git show <commit-hash>` to verify that the commit has **multiple parents**, which definitively indicates a merge commit.
+* Characters like `|`, `\`, and `/` represent how the commit history branches and merges:
+
+  * `|` → continuation of the same line of development
+  * `\` → branch diverging
+  * `/` → branches merging back together
+* In the section:
+
+  ```
+  |\
+  | * 50e2b66 (bugfix/typo) fix: correct footer typo
+  * | 7651f2e style: improve footer spacing
+  |/
+  ```
+
+  * the history splits after an earlier commit (lower in the graph)
+  * `50e2b66` was created on the `bugfix/typo` branch
+  * `7651f2e` was created on the `master` branch
+* The `*` for `50e2b66` appears slightly to the **right** because it belongs to a **different branch line**, visually separated from `master`.
+* The point where the lines split (below this section) represents where the **branch diverged** from the main line.
+  > **Note:** Even if the `bugfix/typo` branch is deleted, the divergence shown in the graph remains unchanged because the commits are already part of history through the merge. The only difference is that the branch label (`bugfix/typo`) will no longer appear next to commit `50e2b66`. This demonstrates that merging preserves the complete history, and the target branch (`master`) now contains that history.
+* The point where the lines come back together at `e19bec5` represents where the **branch was merged back** into `master`.
+* The merge commit (`e19bec5`) has **two parents**:
+
+  * one from `master` (`7651f2e`)
+  * one from `bugfix/typo` (`50e2b66`)
+  > **Note:** A merge commit does not duplicate or move commits. It records **multiple parent commits**, linking previously separate lines of development into a single history. Because of this, all commits from the merged branches become reachable from the target branch.
+* All commits below (`43428af`, `58b133f`, etc.) belong to the **common history before the branch was created**.
+
+---
+
+#### Visualizing the Graph in VS Code
+
+If you would like a graphical visualization of the commit graph, you can install the **Git Graph** extension in VS Code.
+
+Search for **Git Graph** (by **mhutchie**) in the Extensions marketplace and install it.
+
+This extension provides an **interactive graphical view of the repository history**, allowing you to easily visualize:
+
+* branches
+* merges
+* commit relationships
+
+directly inside VS Code.
+
+---
+
+#### Clean Up the Bugfix Branch
+
+Once the branch has been merged successfully, it is usually safe to delete it.
+
+```bash
+git branch -d bugfix/typo
+```
+
+Deleting the branch removes the **branch pointer**, but the commits introduced by that branch **remain part of the repository history**, because they are now reachable from the `master` branch.
+
+This keeps the repository **clean and easier to navigate**.
+
+---
+
+
+### Step 9: Demonstrate a Merge Conflict
+
+![Alt text](/images/f1.png)
+
+In the previous example we saw a **three-way merge that Git resolved automatically**.
+
+However, Git cannot always reconcile changes automatically. When Git cannot determine how to combine changes from two branches, it raises a **merge conflict** that must be resolved manually.
+
+A merge conflict occurs when **Git cannot automatically reconcile changes made in two branches during a merge**.
+
+Importantly, a conflict does **not occur simply because branches have diverged**.
+
+A conflict occurs only when **both branches modify the same lines of the same file in different ways**.
+
+If the changes affect:
+
+* different files
+* different, non-overlapping lines within the same file
+
+Git can usually merge the changes automatically without conflict.
+
+Conflicts occur only when the changes **overlap and Git cannot determine which version should be kept**.
+
+This happens because Git’s merge engine operates on **line-based differences (called hunks)**.
+
+> **Key concept:** Branch divergence does not cause conflicts. **Overlapping changes cause conflicts.**
+
+---
+
+#### Creating a Conflict Scenario
+
+Recall that in the previous step we merged the `bugfix/typo` branch into `master`, which created the **merge commit `G`**.
+
+Before that merge occurred:
+
+* the `bugfix/typo` branch introduced commit **E**
+* the `master` branch introduced commit **F**
+
+Git combined these two lines of development through the **merge commit `G`**, which has **two parent commits: `F` and `E`**.
+
+At this stage the repository looks like:
+
+```
+A --- B --- C --- D --- F -------- G   (master)
+                   \               /
+                    E -------------
+```
+
+Commit **G** now represents the **latest state of the repository on the `master` branch**, containing the combined work from both branches.
+
+---
+
+We will now create a new branch from the **current commit (`G`)** to simulate conflicting changes.
+
+First create a new branch:
+
+```bash
+git checkout -b conflict/demo
+```
+
+Both branches now point to the same commit:
+
+```
+A --- B --- C --- D --- F -------- G   (master, conflict/demo)
+                   \               /
+                    E -------------
+```
+
+This means both branches currently have **identical project state**.
+
+---
+
+#### Add a Change on the `conflict/demo` Branch
+
+Now modify the file on the `conflict/demo` branch:
+
+```bash
+echo "Footer color changed to blue" >> app.txt
+git add app.txt
+git commit -m "style: change footer color to blue"
+```
+
+This creates a new commit **`H`** on the `conflict/demo` branch.
+
+The repository now looks like:
+
+```
+A --- B --- C --- D --- F -------- G   (master)
+                   \               / \
+                    E -------------   H   (conflict/demo)
+```
+
+Commit **H** represents the change introduced on the `conflict/demo` branch.
+
+At this point:
+
+* `master` still points to **G**
+* `conflict/demo` points to **H**
+
+---
+
+#### Add a Different Change on `master`
+
+Now switch back to the primary branch:
+
+```bash
+git checkout master
+```
+
+Modify the **same content differently**:
+
+```bash
+echo "Footer color changed to green" >> app.txt
+git add app.txt
+git commit -m "style: change footer color to green"
+```
+
+This creates a new commit **`I`** on the `master` branch.
+
+Now the branches have **diverged from commit `G`**:
+
+```
+A --- B --- C --- D --- F -------- G --- I   (master)
+                   \               / \
+                    E -------------   H   (conflict/demo)
+```
+
+At this stage:
+
+* `master` has introduced commit **I**
+* `conflict/demo` has introduced commit **H**
+* both commits were created **independently from the same parent commit (`G`)**
+
+This is a classic case of **branch divergence**.
+
+---
+
+### Why This Will Cause a Conflict
+
+Both branches modified **the same file (`app.txt`) and the same line differently**:
+
+```
+master        → Footer color changed to green
+conflict/demo → Footer color changed to blue
+```
+
+Because these changes affect the **same line of the same file**, Git cannot determine which version should be preserved.
+
+This overlapping modification creates the conditions for a **merge conflict**.
+
+---
+
+#### Attempt the Merge
+
+Now attempt the merge:
+
+```bash
+git merge conflict/demo
+```
+
+Git reports a **merge conflict**:
+
+```
+Auto-merging app.txt
+CONFLICT (content): Merge conflict in app.txt
+Automatic merge failed; fix conflicts and then commit the result.
+```
+
+Git pauses the merge because it **cannot determine which version of the overlapping changes should be kept**.
+
+> At this moment both branches modified the same line independently, which means the next merge attempt will produce a conflict.
+
+---
+
+#### Inspecting the Conflict
+
+Open the file **`app.txt`** in **VS Code**.
+
+VS Code detects the conflict and provides a **merge comparison interface**.
+
+You will see options such as:
+
+• **Accept Current Change** → keep the version from the current branch (`master`)
+• **Accept Incoming Change** → keep the version from the branch being merged (`conflict/demo`)
+• **Accept Both Changes** → keep both modifications
+• **Compare Changes** → view both changes side-by-side
+
+---
+
+#### What Git Actually Did to the File
+
+Git inserts **conflict markers** directly into the file:
+
+```
+<<<<<<< HEAD
+Footer color changed to green
+=======
+Footer color changed to blue
+>>>>>>> conflict/demo
+```
+
+These markers indicate:
+
+• `<<<<<<< HEAD` → change from the **current branch (`master`)**
+• `=======` → separator between the two versions
+• `>>>>>>> conflict/demo` → change from the **incoming branch**
+
+You must **edit the file and decide which content should remain**.
+
+---
+
+##### Completing the Merge
+
+After resolving the conflict and saving the file:
+
+```bash
+git add app.txt
+git commit
+```
+
+This creates the **merge commit `J`**, completing the merge operation.
+
+> **Summary:** A merge conflict occurs **only when Git cannot automatically reconcile overlapping changes**. If two branches modify **different files or different non-overlapping lines**, Git merges them automatically without conflicts.
+
+---
+
+#### Inspecting the Commit Graph After the Merge
+
+After resolving the merge conflict and completing the merge, inspect the history:
+
+```bash
+git log --oneline --graph --all
+```
+
+Example:
+
+```
+*   83abaa1 (HEAD -> master) Merge branch 'conflict/demo'
+|\
+| * 87e4d38 (conflict/demo) style: change footer color to blue
+* | c406e5e style: change footer color to green
+|/
+*   78df726 Merge branch 'bugfix/typo'
+|\
+| * f7d93c9 (bugfix/typo) fix: correct footer typo
+* | ec4a6a0 style: improve footer spacing
+* | 1d2ac28 (feature/login) feat: implement login functionality
+|/
+* 8ab7e70 feat: add footer section
+* 7dc4c4c style: improve application header styling
+* 32017a8 chore: initialize application
+```
+
+This output provides a **text-based visualization of the commit graph**, showing how branches diverged and were later merged.
+
+> **Note:** The vertical alignment of branches in `git log --graph` may vary. Git dynamically arranges the graph to keep it readable, so a branch may appear on the left, right, or center. What matters is the **connections between commits**, which represent how development histories diverged and were later merged.
+
+---
+
+#### Cleaning Up the Conflict Branch
+
+Now that the conflict has been resolved and the merge has been completed successfully, the `conflict/demo` branch is no longer needed.
+
+You can safely delete it.
+
+```bash
+git branch -d conflict/demo
+```
+
+Example output:
+
+```
+Deleted branch conflict/demo (was 87e4d38).
+```
+
+This removes the **branch pointer**, but the commits introduced by that branch remain part of the repository history because they are now reachable from the `master` branch through the merge commit.
+
+If you inspect the remaining branches:
+
+```bash
+git branch
+```
+
+Example output:
+
+```
+* master
+```
+
+At this stage the repository is clean again, with all changes fully integrated into the primary branch.
+
+> **Important:** In Git, deleting a branch removes only the **reference (pointer)** to a commit.
+> The commits themselves remain in the repository as long as they are reachable from another branch, such as `master`.
+
+
+
+
+---
+
+### Step 10: Rename `master` to `main`
+
+Historically, Git repositories used **`master`** as the default primary branch name.
+
+In recent years, many platforms and open-source communities have moved toward **`main`** as the preferred default.
+
+For example:
+
+* Platforms such as **GitHub** create new repositories with **`main`** as the default branch.
+* Some **local Git installations** may still initialize repositories with **`master`**, depending on the Git version and configuration.
+
+Both names are technically valid, and Git **does not enforce any specific naming convention**.
+
+Some organizations also use alternative primary branch names such as:
+
+* `main`
+* `trunk`
+* `production`
+* `stable`
+* `release`
+
+These are simply **team conventions**, not technical requirements.
+
+If your repository currently uses `master`, you can rename it to `main`:
+
+~~~bash
+git branch -m master main
+~~~
+
+Verify the change:
+
+~~~bash
+git branch
+~~~
+
+Example output:
+
+~~~
+* main
+~~~
+
+The repository now uses **`main` as the primary branch**.
+
+
+> **Note:** You can configure Git so that all newly initialized repositories use `main` (or any name you prefer) as the default branch.
+>
+> ~~~bash
+> git config --global init.defaultBranch main
+> ~~~
+>
+> This setting applies to **future repositories created with `git init`**. Existing repositories are not affected.
+
+---
+
+## Undoing Commits: `git reset` & `git revert`
+
+![Alt text](/images/g1.png)
+
+During development, it is common to realize that a commit was **mistaken, incomplete, or no longer needed**.
+
+Git provides multiple ways to **undo changes**, but two of the most commonly used commands are:
+
+~~~bash
+git reset
+git revert
+~~~
+
+Both commands allow you to **undo the effect of commits**, but they do so in **very different ways**.
+
+Understanding this distinction is important because one command **rewrites history**, while the other **preserves it**. Using the wrong command in the wrong situation can affect collaborators or change the repository history in unexpected ways.
+
+---
+
+## `git reset` & `git revert`
+
+`git reset` **rewrites history by moving the branch pointer backward to a previous commit.**
+
+`git revert` **creates a new commit that reverses the changes introduced by an earlier commit.**
+
+Because of this difference:
+
+* `reset` is typically used for **correcting local commit history**
+* `revert` is commonly used for **undoing commits in shared repositories without altering history**
+
+> **Note:** A **shared repository** is a repository hosted on a remote (such as GitHub, GitLab, etc.) that is **used by multiple developers or DevOps engineers for collaboration**.
+> In such environments, preserving commit history is critical for **traceability, debugging, and team coordination**, which is why `git revert` is preferred.
+> In contrast, when working alone on a **local or personal project**, `git reset` is often preferred for quickly cleaning up history before sharing changes.
+
+---
+
+
+## 1. Git Reset
+
+`git reset` moves the **current branch pointer backward to a previous commit**.
+
+In simple terms:
+
+> Git makes the branch point to an earlier commit, effectively removing later commits from the branch history.
+
+Suppose our commit history looks like this:
+
+~~~
+A --- B --- C   (HEAD -> main)
+~~~
+
+Now assume commit **C** was a mistake.
+
+If we run:
+
+~~~bash
+git reset B
+~~~
+
+the history becomes:
+
+~~~
+A --- B   (HEAD -> main)
+     
+      C   (no longer referenced by the branch)
+~~~
+
+Commit **C still exists in Git’s internal history**, but the branch no longer points to it.
+
+From the perspective of the branch history, it appears as if commit **C never happened**.
+
+> **Note:** Commits in Git are **immutable objects**. You cannot modify an existing commit.
+> Operations like `git reset` do **not change or edit commits**; they simply **move branch pointers**, making certain commits unreachable from that branch.
+> The contents of files can be changed in new commits, and commits can become unreachable (and eventually cleaned up), but the **original commit object itself is never modified**.
+
+---
+
+### Types of Reset
+
+`git reset` behaves differently depending on the **mode used**. Each mode determines what happens to the **commit history, the staging area, and the working directory**.
+
+Assume the following commit history:
+
+~~~
+A --- B --- C   (HEAD -> main)
+~~~
+
+Commit **C** added a new line to `app.txt`:
+
+~~~
+Login feature added
+~~~
+
+Now we run:
+
+~~~
+git reset B
+~~~
+
+
+The behavior depends on the reset mode.
+
+| Reset Type          | What Happens                                                      | Example (`app.txt`)                                                                 | Typical Next Action                                                         |
+| ------------------- | ----------------------------------------------------------------- | ----------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| `--soft`            | branch moves back; **changes remain staged**                      | commit C is no longer in branch history, but `Login feature added` is still staged  | usually **recommit immediately** (possibly with a corrected commit message) |
+| `--mixed` (default) | branch moves back; **changes become unstaged**                    | commit C is no longer in branch history, but the line remains as an unstaged change | **edit if needed → `git add` → commit again**                               |
+| `--hard`            | branch moves back; **changes are removed from working directory** | commit C is no longer in branch history and the line is removed from `app.txt`      | **start fresh → make changes → stage → commit again**                       |
+
+
+> **Note:** The commit is not immediately deleted. It becomes **unreachable from the branch** and can often be recovered using `git reflog`.
+
+---
+
+
+
+#### A. `git reset --soft`
+
+This removes the commit but **keeps the changes staged**.
+
+Starting history:
+
+~~~
+A --- B --- C   (HEAD)
+~~~
+
+Run:
+
+~~~bash
+git reset --soft B
+~~~
+
+Result:
+
+~~~
+A --- B   (HEAD)
+~~~
+
+However, the changes from commit **C** remain **staged in the index**.
+
+You can immediately recommit them:
+
+~~~bash
+git commit -m "new corrected commit"
+~~~
+
+---
+
+#### B. `git reset --mixed` (default)
+
+This removes the commit and **unstages the changes**.
+
+Run:
+
+~~~bash
+git reset B
+~~~
+
+Result:
+
+~~~
+A --- B   (HEAD)
+~~~
+
+The changes from **C** now exist only in the **working directory**.
+
+If you want them in a new commit, you must stage them again:
+
+~~~bash
+git add .
+git commit
+~~~
+
+---
+
+#### C. `git reset --hard`
+
+This removes the commit and **deletes the changes completely**.
+
+Run:
+
+~~~bash
+git reset --hard B
+~~~
+
+Result:
+
+~~~
+A --- B   (HEAD)
+~~~
+
+All changes from **C are permanently discarded**.
+
+> **Note:** `git reset --hard` is destructive because it removes work from both the commit history and the working directory.
+
+---
+
+
+### Demo: Reset (`--mixed`, default)
+
+Create a few commits:
+
+~~~bash
+echo "Feature A" > app.txt
+git add app.txt
+git commit -m "feat: add feature A"
+
+echo "Feature B" >> app.txt
+git add app.txt
+git commit -m "feat: add feature B"
+
+echo "Feature C" >> app.txt
+git add app.txt
+git commit -m "feat: add feature C"
+~~~
+
+View the commit history:
+
+~~~bash
+git log --oneline --graph
+~~~
+
+Example output:
+
+~~~
+* 8ac41f3 feat: add feature C
+* 4b21d8a feat: add feature B
+* 1f90c12 feat: add feature A
+~~~
+
+Conceptually, the history looks like:
+
+~~~
+A --- B --- C   (HEAD -> main)
+~~~
+
+Now suppose commit **C** introduced an incorrect change.
+
+We can move the branch pointer back to commit **B**:
+
+~~~bash
+git reset 4b21d8a
+~~~
+
+Output:
+
+~~~
+Unstaged changes after reset:
+M app.txt
+~~~
+
+
+> **Note:** Instead of specifying commit IDs, you can use relative references like `HEAD~1`, `HEAD~2`, etc., which move backward from the current commit.
+>
+> ```
+> A --- B --- C   (HEAD -> main)
+> ```
+>
+> * `HEAD` → `C` (current commit)
+> * `HEAD~1` → `B` (previous commit)
+> * `HEAD~2` → `A` (two commits before)
+>
+> For example:
+>
+> ```
+> git reset HEAD~1
+> ```
+>
+> This moves the branch pointer from **C → B**.
+
+
+Now check the commit history again:
+
+~~~bash
+git log --oneline --graph
+~~~
+
+Example output:
+
+~~~
+* 4b21d8a feat: add feature B
+* 1f90c12 feat: add feature A
+~~~
+
+Conceptually:
+
+~~~
+A --- B   (HEAD -> main)
+~~~
+
+Commit **C** is no longer part of the branch history.
+
+However, the **changes from commit C are not lost**.
+
+Check the repository status:
+
+~~~bash
+git status
+~~~
+
+You will see that the changes from commit **C** now appear as **unstaged modifications in the working directory**.
+
+Open the file to inspect it:
+
+~~~bash
+cat app.txt
+~~~
+
+Example:
+
+~~~
+Feature A
+Feature B
+Feature C
+~~~
+
+Suppose the correct implementation should be:
+
+~~~
+Feature C now updated
+~~~
+
+Modify the file accordingly.
+
+Then stage and commit the corrected version:
+
+~~~bash
+git add app.txt
+git commit -m "feat: add updated feature C"
+~~~
+
+Now the history becomes:
+
+~~~
+A --- B --- D   (HEAD -> main)
+~~~
+
+Where **D** is the corrected implementation.
+
+---
+
+### Inspecting What Happened with `git reflog`
+
+**What is `git reflog`**
+
+`git log` shows commit history, while `git reflog` shows all local movements of HEAD and branch pointers.
+
+Even though commit **C** disappeared from the branch history, Git still remembers it internally.
+
+You can see this using:
+
+~~~bash
+git reflog
+~~~
+
+Example output:
+
+~~~
+d3fa2b1 HEAD@{0}: commit: feat: add updated feature C
+4b21d8a HEAD@{1}: reset: moving to 4b21d8a
+8ac41f3 HEAD@{2}: commit: feat: add feature C
+~~~
+
+`git reflog` shows **every movement of HEAD**, including:
+
+* commits
+* resets
+* merges
+* rebases
+* checkouts
+
+This is extremely useful because it allows you to **recover commits even after history rewriting commands like `reset`**.
+
+---
+
+> **Important:** Avoid using `git reset` on commits that were **already pushed to a shared repository**, because reset rewrites history and may disrupt collaborators.
+
+---
+
+## 2. Git Revert
+
+Unlike `git reset`, `git revert` **does not remove commits from history**.
+
+Instead, it **creates a new commit that reverses the changes introduced by an earlier commit**.
+
+This preserves the complete commit history while undoing the effect of the problematic commit.
+
+Consider the following history:
+
+~~~
+A --- B --- C   (HEAD -> main)
+~~~
+
+Now suppose commit **C** introduced an incorrect change.
+
+To undo its effect without rewriting history, we can run:
+
+~~~bash
+git revert C
+~~~
+
+Git creates a **new commit that reverses the changes introduced by C**.
+
+The history now becomes:
+
+~~~
+A --- B --- C --- D   (HEAD -> main)
+~~~
+
+Commit **D** contains the **inverse of the changes introduced in commit C**.
+
+As a result:
+
+* commit **C remains in the history**
+* commit **D cancels the effect of C**
+
+So the repository history remains intact, while the changes introduced by **C** are effectively undone.
+
+
+> **Note:** `git revert` is safer for **shared repositories** because it does **not rewrite history**.
+> Instead, it creates a **new commit that reverses an earlier commit**.
+>
+> For example:
+>
+> ~~~bash
+> git revert HEAD
+> ~~~
+>
+> This creates a new commit that **undoes the changes introduced by the most recent commit** while preserving the existing commit history.
+
+---
+
+### Demo: Revert
+
+Create a few commits:
+
+~~~bash
+echo "Feature A" > app.txt
+git add app.txt
+git commit -m "feat: add feature A"
+
+echo "Feature B" >> app.txt
+git add app.txt
+git commit -m "feat: add feature B"
+
+echo "Feature C" >> app.txt
+git add app.txt
+git commit -m "feat: add feature C"
+~~~
+
+View the commit history:
+
+~~~bash
+git log --oneline --graph
+~~~
+
+Example output:
+
+~~~
+* c7f015e feat: add feature C
+* ba0dc11 feat: add feature B
+* 9448788 feat: add feature A
+~~~
+
+Conceptually:
+
+~~~
+A --- B --- C   (HEAD -> main)
+~~~
+
+Now suppose commit **C** introduced a bug that should be undone.
+
+Instead of rewriting history, we create a **revert commit**.
+
+Run:
+
+~~~bash
+git revert HEAD
+~~~
+
+Git opens an editor allowing you to confirm or modify the revert commit message.
+
+After saving, Git creates a **new commit that reverses the changes introduced in C**.
+
+View the history again:
+
+~~~bash
+git log --oneline --graph
+~~~
+
+Example output:
+
+~~~
+* d3f1a21 revert "feat: add feature C"
+* c7f015e feat: add feature C
+* ba0dc11 feat: add feature B
+* 9448788 feat: add feature A
+~~~
+
+Conceptually the history now looks like:
+
+~~~
+A --- B --- C --- D   (HEAD -> main)
+~~~
+
+Where:
+
+* **C** introduced the change
+* **D** reverses the effect of **C**
+
+---
+
+### Inspect the file
+
+Open the file:
+
+~~~bash
+cat app.txt
+~~~
+
+Before revert it contained:
+
+~~~
+Feature A
+Feature B
+Feature C
+~~~
+
+After the revert commit it becomes:
+
+~~~
+Feature A
+Feature B
+~~~
+
+The effect of **Feature C** has been removed, even though commit **C** still exists in history.
+
+> **Note:** In this demo we reverted the **latest commit** using `git revert HEAD`.
+> You can also revert **any earlier commit** by specifying its commit ID.
+>
+> For example:
+>
+> ~~~bash
+> git revert <commit-id>
+> ~~~
+>
+> If the commit you are reverting is **not the latest commit**, Git may sometimes ask you to resolve **merge conflicts**, because later commits may have modified the same parts of the file.
+>
+> I encourage you to experiment with this in your own repository.
+
+
+
+> **Note:** Unlike `git reset`, `git revert` **does not rewrite branch history**.
+> Instead, Git creates a **new commit that reverses the changes introduced by an earlier commit**.
+> Because the existing history remains intact, `git revert` is the **preferred approach when working with shared repositories**.
+
+---
+
+### When to Use Each
+
+| Situation                                           | Use          | Why                                       |
+| --------------------------------------------------- | ------------ | ----------------------------------------- |
+| Fix a mistake in **local commits (not pushed yet)** | `git reset`  | safely rewrites local history             |
+| Clean up or reorganize **local commit history**     | `git reset`  | useful before pushing changes             |
+| Undo a commit that was **already pushed**           | `git revert` | preserves shared history                  |
+| Undo changes in a **collaborative repository**      | `git revert` | avoids breaking other developers' history |
+
+
+> **Simple rule:** If the commit was **already pushed**, use `git revert`. If it exists **only locally**, `git reset` is usually appropriate.
+
+---
+
+# Conclusion
+
+Git is fundamentally a **system for managing change**.
+
+While many developers initially learn Git through a small set of commands, understanding its **core concepts and architecture** is what enables engineers to use it effectively in real-world environments.
+
+In this masterclass we explored the foundational building blocks that define how Git operates:
+
+* The **working directory**, **staging area**, and **local repository**
+* How commits represent **immutable snapshots of project state**
+* How Git history forms a **graph of commits rather than a linear list**
+* How **branches enable parallel development**
+* How **fast-forward and three-way merges integrate independent lines of development**
+* Why **merge conflicts occur** and how they are resolved
+* How to safely undo changes using **`git reset`** and **`git revert`**
+
+Understanding these concepts allows engineers to reason about Git operations with confidence. Instead of memorizing commands, you begin to understand **how Git models project history and how branch pointers move through the commit graph**.
+
+This conceptual clarity becomes extremely valuable when working in **large collaborative environments**, where repositories may contain thousands of commits, multiple active branches, and complex integration workflows.
+
+In **Part 2 of this Git Masterclass**, we will extend these foundations to cover:
+
+* **Git Diff** & **Git Stash**
+* Working with **remote repositories**
+* **Push, pull, and fetch workflows**
+* **Pull requests and code review workflows**
+* **Rebasing and history rewriting**
+* Practical collaboration strategies used in **real production environments**
+
+By the end of the full masterclass, you will not only know how to use Git commands, but you will understand **how Git actually works under the hood**, which is the key to mastering it.
+
+---
+
+# References
+
+Official documentation and additional resources that may help deepen your understanding of Git.
+
+Git Documentation: https://git-scm.com/docs  
+Git Official Website: https://git-scm.com/  
+Pro Git Book: https://git-scm.com/book/en/v2  
+GitHub Documentation: https://docs.github.com/  
+Git Ignore Templates Repository: https://github.com/github/gitignore  
+Atlassian Git Tutorials: https://www.atlassian.com/git/tutorials
