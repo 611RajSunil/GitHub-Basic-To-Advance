@@ -18,5 +18,5 @@ Why Follow This Masterclass?
 2. **Deep Internals Coverage:** Learn Git’s snapshot model, commit graph, and branching mechanics
 3. **Beginner Friendly:** Starts from fundamentals with no prior assumptions
 4. **Production-Oriented:** Covers real workflows used in DevOps and engineering teams
-5. **Hands-On + Theory:** Balanced approach with demos and conceptual clarity
+5. **Hands-On + Theory:** Balanced approach with demos and conceptual clarity.
 
