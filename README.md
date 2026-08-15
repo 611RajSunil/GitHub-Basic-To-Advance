@@ -4,7 +4,7 @@ This repository is your central hub for learning Git from fundamentals to real-w
 
 What You’ll Find in This Repository
 -----------------------------------------------------------------------------------------------------------------------------------------------
-1. **Organized by Parts:** 1. Foundations, 2. Collaboration & Production Workflows, and 3. Advanced History & Integration Strategies.
+1. **Organized by Parts: 1. Foundations, 2. Collaboration & Production Workflows, and 3. Advanced History & Integration Strategies**
 2. **Core Concept Notes:** Git architecture, commits, staging, and history model
 3. **Branching & Merging:** Fast-forward, three-way merge, and conflict resolution
 4. **Undo Operations:** git reset and git revert explained with practical scenarios
