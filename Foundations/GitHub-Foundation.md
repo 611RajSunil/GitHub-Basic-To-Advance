@@ -3248,7 +3248,7 @@ Understanding these concepts allows engineers to reason about Git operations wit
 
 This conceptual clarity becomes extremely valuable when working in **large collaborative environments**, where repositories may contain thousands of commits, multiple active branches, and complex integration workflows.
 
-In **Collaboration & Production Workflows of this Git Masterclass**, we will extend these foundations to cover:
+In **Collaboration & Production Workflows of this Git Basic To Advance**, we will extend these foundations to cover:
 
 * **Git Diff** & **Git Stash**
 * Working with **remote repositories**
