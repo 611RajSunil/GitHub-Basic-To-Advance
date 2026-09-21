@@ -362,9 +362,11 @@ You may notice that my terminal prompt shows **`(master)`** after running `git i
 Example:
 
 ~~~
-┌-[varunjoshi@Varuns-MacBook-Pro]-[~/courses/Git-Masterclass/project-files](master)
+┌-[Need to add our github name]-[~/courses/Git-Masterclass/project-files](master)
 └─>
 ~~~
+
+[sunilraj@sunilraj-ramachandran-windows]-[~/courses/Git-Masterclass/project-files](master)
 
 This happens because I have configured my **`~/.zshrc`** file to display the **currently active Git branch** in the terminal prompt.
 
@@ -695,14 +697,14 @@ Git embeds author identity in every commit through `user.name` and `user.email`.
 
 Configure globally (recommended for personal machines):
 
-~~~bash id="d7mucq"
-git config --global user.name "Varun Joshi"
-git config --global user.email "cloudwithvarjosh@gmail.com"
+~~~
+git config --global user.name "Sunil Raj Ramachandran"
+git config --global user.email "rajsunil031@gmail.com"
 ~~~
 
 Unset if necessary:
 
-~~~bash id="m1r15e"
+~~~
 git config --global --unset user.name
 git config --global --unset user.email
 ~~~
@@ -744,13 +746,13 @@ The closest configuration to the repository wins.
 
 You can see where a value is coming from using:
 
-~~~bash id="jv1v7h"
+~~~
 git config --show-origin user.name
 ~~~
 
 Or list all configuration with origins:
 
-~~~bash id="m28ceg"
+~~~
 git config --list --show-origin
 ~~~
 
