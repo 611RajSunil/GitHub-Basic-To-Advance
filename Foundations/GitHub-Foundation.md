@@ -697,14 +697,14 @@ Git embeds author identity in every commit through `user.name` and `user.email`.
 
 Configure globally (recommended for personal machines):
 
-~~~
+~~~bash
 git config --global user.name "Sunil Raj Ramachandran"
 git config --global user.email "rajsunil031@gmail.com"
 ~~~
 
 Unset if necessary:
 
-~~~
+~~~bash
 git config --global --unset user.name
 git config --global --unset user.email
 ~~~
@@ -1556,8 +1556,6 @@ login.txt
 
 ## Git Merge
 
-![Alt text](/images/e1.png)
-
 In Git, development work typically happens on **separate branches**. Once that work is complete and validated, the changes must be **integrated back into the primary branch**.
 
 This integration process is called **merging**.
@@ -2312,8 +2310,6 @@ This keeps the repository **clean and easier to navigate**.
 
 ### Step 9: Demonstrate a Merge Conflict
 
-![Alt text](/images/f1.png)
-
 In the previous example we saw a **three-way merge that Git resolved automatically**.
 
 However, Git cannot always reconcile changes automatically. When Git cannot determine how to combine changes from two branches, it raises a **merge conflict** that must be resolved manually.
@@ -2664,8 +2660,6 @@ The repository now uses **`main` as the primary branch**.
 ---
 
 ## Undoing Commits: `git reset` & `git revert`
-
-![Alt text](/images/g1.png)
 
 During development, it is common to realize that a commit was **mistaken, incomplete, or no longer needed**.
 
@@ -3254,7 +3248,7 @@ Understanding these concepts allows engineers to reason about Git operations wit
 
 This conceptual clarity becomes extremely valuable when working in **large collaborative environments**, where repositories may contain thousands of commits, multiple active branches, and complex integration workflows.
 
-In **Part 2 of this Git Masterclass**, we will extend these foundations to cover:
+In **Collaboration & Production Workflows of this Git Masterclass**, we will extend these foundations to cover:
 
 * **Git Diff** & **Git Stash**
 * Working with **remote repositories**
